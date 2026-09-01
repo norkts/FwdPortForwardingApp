@@ -59,13 +59,13 @@ public class UdpForwarder extends Forwarder implements Callable<Void> {
         try {
             ByteBuffer readBuffer = ByteBuffer.allocate(BUFFER_SIZE);
 
-            inChannel = DatagramChannel.open();
+            inChannel = openDatagramChannelV4();
             registerResource(inChannel);            inChannel.configureBlocking(false);
 
             try {
-                // 绑定到所有接口（0.0.0.0），使用指定的端口号
-                InetSocketAddress bindAddress = new InetSocketAddress(from.getPort());
-                Log.i(TAG, "UDP binding to port " + from.getPort() + " on all interfaces (0.0.0.0)");
+                // 强制绑定 IPv4 0.0.0.0，避免默认绑定 IPv6 [::] 导致防火墙/iptables 阻止外部连接
+                InetSocketAddress bindAddress = new InetSocketAddress("0.0.0.0", from.getPort());
+                Log.i(TAG, "UDP binding to port " + from.getPort() + " on IPv4 all interfaces (0.0.0.0)");
                 inChannel.socket().bind(bindAddress);
             } catch (SocketException e) {
                 LogBuffer.getInstance().e(TAG, String.format(super.BIND_FAILED_MESSAGE, from.getPort(), protocol, ruleName), e);
@@ -185,6 +185,26 @@ public class UdpForwarder extends Forwarder implements Callable<Void> {
             }
         } catch (Exception e) {
             LogBuffer.getInstance().e(TAG, "Error closing UdpForwarder resources", e);
+        }
+    }
+
+    /**
+     * 创建强制绑定 IPv4 (0.0.0.0) 的 DatagramChannel。
+     * Android 默认 new DatagramChannel().bind() 会绑定到 IPv6 [::]，
+     * 导致某些设备/MIUI 防火墙阻止 IPv4 客户端连接。API 33+ 通过
+     * StandardProtocolFamily.INET 强制创建 IPv4 socket，旧设备回退默认。
+     */
+    private static DatagramChannel openDatagramChannelV4() throws IOException {
+        try {
+            Class<?> pfClass = Class.forName("java.net.ProtocolFamily");
+            Class<?> spfClass = Class.forName("java.net.StandardProtocolFamily");
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            Enum inet = Enum.valueOf((Class<? extends Enum>) spfClass, "INET");
+            java.lang.reflect.Method open = DatagramChannel.class.getMethod("open", pfClass);
+            return (DatagramChannel) open.invoke(null, inet);
+        } catch (Exception e) {
+            // 旧设备或反射失败：回退默认行为
+            return DatagramChannel.open();
         }
     }    static class ClientRecord {
         public SocketAddress toAddress;

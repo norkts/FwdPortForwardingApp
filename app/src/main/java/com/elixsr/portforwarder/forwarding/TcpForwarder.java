@@ -60,12 +60,12 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
             registerResource(selector);
             ByteBuffer readBuffer = ByteBuffer.allocate(BUFFER_SIZE);
 
-            listening = ServerSocketChannel.open();
+            listening = openServerSocketChannelV4();
             registerResource(listening);            listening.configureBlocking(false);
 
             try {
-                // 绑定到所有接口（0.0.0.0），使用指定的端口号
-                InetSocketAddress bindAddress = new InetSocketAddress(from.getPort());
+                // 强制绑定 IPv4 0.0.0.0，避免默认绑定 IPv6 [::] 导致防火墙/iptables 阻止外部连接
+                InetSocketAddress bindAddress = new InetSocketAddress("0.0.0.0", from.getPort());
                 Log.i(TAG, "TCP binding to port " + from.getPort() + " on all interfaces (0.0.0.0)");
                 listening.socket().bind(bindAddress, 0);
             } catch (java.net.BindException e) {
@@ -95,27 +95,31 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
                             SelectionKey key = it.next();
                             it.remove();
 
-                            if (key.isValid() && key.isAcceptable()) {
-                                processAcceptable(key, to);
+                            if (!key.isValid()) {
+                                continue;
                             }
 
-                            if (key.isValid() && key.isConnectable()) {
-                                processConnectable(key);
-                            }
-
-                            if (key.isValid() && key.isReadable()) {
-                                processReadable(key, readBuffer);
-                            }
-
-                            if (key.isValid() && key.isWritable()) {
-                                processWritable(key);
+                            // 每个 key 单独处理，异常只关闭该连接，绝不终止 selector 循环
+                            try {
+                                if (key.isAcceptable()) {
+                                    processAcceptable(key, to);
+                                } else if (key.isConnectable()) {
+                                    processConnectable(key);
+                                } else if (key.isReadable()) {
+                                    processReadable(key, readBuffer);
+                                } else if (key.isWritable()) {
+                                    processWritable(key);
+                                }
+                            } catch (IOException e) {
+                                LogBuffer.getInstance().e(TAG, "Error processing connection on port " + from.getPort() + ": " + e.getMessage());
+                                closeConnection(key);
                             }
                         }
                     }
                 }
             } finally {
                 // 确保资源被正确清理
-                LogBuffer.getInstance().i(TAG, "TCP cleaning up resources on port " + from.getPort());
+                Log.i(TAG, "TCP cleaning up resources on port " + from.getPort() + " (loop exited, interrupted=" + Thread.currentThread().isInterrupted() + ")");
                 close();
             }
         } catch (IOException e) {
@@ -126,11 +130,23 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
         return null;
     }
 
+    /**
+     * 关闭出错连接的通道，避免单个连接异常终止整个 selector 循环。
+     */
+    private static void closeConnection(SelectionKey key) {
+        try {
+            key.cancel();
+            if (key.channel() != null) {
+                key.channel().close();
+            }
+        } catch (IOException ignored) {
+        }
+    }
+
     private static void registerReads(
             Selector selector,
             SocketChannel socket,
-            SocketChannel forwardToSocket) throws ClosedChannelException {
-        RoutingPair pairFromToPair = new RoutingPair();
+            SocketChannel forwardToSocket) throws ClosedChannelException {        RoutingPair pairFromToPair = new RoutingPair();
         pairFromToPair.from = socket;
         pairFromToPair.to = forwardToSocket;
         pairFromToPair.from.register(selector, SelectionKey.OP_READ, pairFromToPair);
@@ -203,6 +219,7 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
             SelectionKey key,
             InetSocketAddress forwardToAddress) throws IOException {
         SocketChannel from = ((ServerSocketChannel) key.attachment()).accept();
+        Log.i(TAG, "TCP accepted connection from " + from.socket().getRemoteSocketAddress() + " on port " + ((ServerSocketChannel) key.attachment()).socket().getLocalPort());
         LogBuffer.getInstance().i(TAG, "TCP accepted connection from " + from.socket().getRemoteSocketAddress());
         from.socket().setTcpNoDelay(true);
         from.configureBlocking(false);
@@ -233,6 +250,26 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
             }
         } catch (Exception e) {
             LogBuffer.getInstance().e(TAG, "Error closing TcpForwarder resources", e);
+        }
+    }
+
+    /**
+     * 创建强制绑定 IPv4 (0.0.0.0) 的 ServerSocketChannel。
+     * Android 默认 new ServerSocketChannel().bind() 会绑定到 IPv6 [::]，
+     * 导致某些设备/MIUI 防火墙阻止 IPv4 客户端连接。API 33+ 通过
+     * StandardProtocolFamily.INET 强制创建 IPv4 socket，旧设备回退默认。
+     */
+    private static ServerSocketChannel openServerSocketChannelV4() throws IOException {
+        try {
+            Class<?> pfClass = Class.forName("java.net.ProtocolFamily");
+            Class<?> spfClass = Class.forName("java.net.StandardProtocolFamily");
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            Enum inet = Enum.valueOf((Class<? extends Enum>) spfClass, "INET");
+            java.lang.reflect.Method open = ServerSocketChannel.class.getMethod("open", pfClass);
+            return (ServerSocketChannel) open.invoke(null, inet);
+        } catch (Exception e) {
+            // 旧设备或反射失败：回退默认行为
+            return ServerSocketChannel.open();
         }
     }    static class RoutingPair {
         SocketChannel from;
