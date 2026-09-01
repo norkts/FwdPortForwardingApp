@@ -18,12 +18,15 @@
 
 package com.elixsr.portforwarder.forwarding;
 
-import android.app.IntentService;
 import android.app.Notification;
+import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
+import android.os.IBinder;
 import android.os.PowerManager;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.TaskStackBuilder;
@@ -55,8 +58,6 @@ import com.elixsr.portforwarder.dao.RuleDao;
 import com.elixsr.portforwarder.db.RuleDbHelper;
 import com.elixsr.portforwarder.exceptions.ObjectNotFoundException;
 import com.elixsr.portforwarder.models.RuleModel;
-import com.google.android.gms.analytics.HitBuilders;
-import com.google.android.gms.analytics.Tracker;
 
 /**
  * The {@link ForwardingService} class acts as a controller of all all forwarding.
@@ -65,7 +66,7 @@ import com.google.android.gms.analytics.Tracker;
  * <p>
  * The class creates a new thread for each Forwarding rule.
  */
-public class ForwardingService extends IntentService {
+public class ForwardingService extends Service {
 
     // Defines a custom Intent action
     public static final String BROADCAST_ACTION =
@@ -88,6 +89,7 @@ public class ForwardingService extends IntentService {
     private static final String CATEGORY_FORWARDING = "Forwarding";
 
     private static final int NOTIFICATION_ID = 1;
+    private static final String CHANNEL_ID = "forwarding_channel";
     private static final String ACTION_START_FORWARDING = "Start - Java NIO";
     private static final String LABEL_FORWARDING_TYPE = "";
     private static final String ACTION_STOP_FORWARDING = "Stop - Java NIO";
@@ -101,8 +103,7 @@ public class ForwardingService extends IntentService {
 
     //wake lock
     private PowerManager.WakeLock wakeLock;
-    private Tracker tracker;
-
+    
     /**
      * Default constructor for {@link ForwardingService}.#
      * <p>
@@ -110,12 +111,10 @@ public class ForwardingService extends IntentService {
      * with a fixed thread pool of 30 threads.
      */
     public ForwardingService() {
-        super(TAG);
         executorService = Executors.newFixedThreadPool(30);
     }
 
     public ForwardingService(ExecutorService executorService) {
-        super(TAG);
         this.executorService = executorService;
     }
 
@@ -123,57 +122,38 @@ public class ForwardingService extends IntentService {
     public void onCreate() {
         super.onCreate();
 
-        /*
-        Sourced from: https://developer.android.com/intl/ja/training/scheduling/wakelock.html
-         */
         PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
                 PORT_FORWARD_SERVICE_WAKE_LOCK_TAG);
         wakeLock.acquire();
 
-        tracker = ((FwdApplication) this.getApplication()).getDefaultTracker();
+        createNotificationChannel();
+        startForeground(NOTIFICATION_ID, createNotification());
+
+        startFloatingWindow();
     }
 
     /**
      * Starts forwarding based on rules found in database.
-     * <p>
-     * Acquires an instance of the Forwarding Manager to turn forwarding flag on.
-     * <p>
-     * Creates a list off callbacks for each forward thread, and handle exceptions as they come.
-     * <p>
-     * If an exception is thrown, the service immediately stops, and the #onDestroy method is
-     * called.
      *
      * @param intent
      */
     @Override
-    protected void onHandleIntent(Intent intent) {
-
-        // Gets data from the incoming Intent
-//        String dataString = intent.getDataString();
+    public int onStartCommand(Intent intent, int flags, int startId) {
 
         Log.i(TAG, "Ran the service");
 
         ForwardingManager.getInstance().enableForwarding();
 
-
         runService = true;
 
-        /*
-         * Creates a new Intent containing a Uri object
-         * BROADCAST_ACTION is a custom Intent action
-         */
         Intent localIntent =
                 new Intent(BROADCAST_ACTION)
-                        // Puts the status into the Intent
                         .putExtra(PORT_FORWARD_SERVICE_STATE, ForwardingManager.getInstance().isEnabled());
-        // Broadcasts the Intent to receivers in this app.
         LocalBroadcastManager.getInstance(this).sendBroadcast(localIntent);
 
         showForwardingEnabledNotification();
 
-        //load the rules from the datastore
-        //TODO: inject the rules as extras
         RuleDao ruleDao = new RuleDao(new RuleDbHelper(this));
         List<RuleModel> ruleModels = ruleDao.getAllEnabledRuleModels();
 
@@ -181,14 +161,7 @@ public class ForwardingService extends IntentService {
 
         InetSocketAddress from;
 
-        Forwarder forwarder = null;
-
-        // how many futures there are to check
-        int remainingFutures = 0;
-
         for (RuleModel ruleModel : ruleModels) {
-
-            // Something has killed the runService, no point in looping anymore
             if (!runService) {
                 break;
             }
@@ -198,32 +171,24 @@ public class ForwardingService extends IntentService {
 
                 if (ruleModel.isTcp() && runService) {
                     ruleModelForwarders.add(new TcpForwarder(from, ruleModel.getTarget(), ruleModel.getName()));
-                    remainingFutures++;
                 }
 
                 if (ruleModel.isUdp() && runService) {
                     ruleModelForwarders.add(new UdpForwarder(from, ruleModel.getTarget(), ruleModel.getName()));
-                    remainingFutures++;
                 }
 
             } catch (SocketException | ObjectNotFoundException e) {
                 Log.e(TAG, "Error generating IP Address for FROM interface with rule '" + ruleModel.getName() + "'", e);
 
-                // graceful UI Exception handling - broadcast this to ui - it will deal with display something to the user e.g. a Toast
                 localIntent =
                         new Intent(BROADCAST_ACTION)
-                                // Puts the status into the Intent
                                 .putExtra(PORT_FORWARD_SERVICE_ERROR_MESSAGE, getString(R.string.start_rule_error_message) + " '" + ruleModel.getName() + "'");
-                // Broadcasts the Intent to receivers in this app.
                 LocalBroadcastManager.getInstance(this).sendBroadcast(localIntent);
             }
         }
 
         executorService = Executors.newFixedThreadPool(ruleModelForwarders.size());
 
-        /*
-         Sourced from: http://stackoverflow.com/questions/19348248/waiting-on-a-list-of-future
-         */
         CompletionService<Void> completionService =
                 new ExecutorCompletionService<>(executorService);
 
@@ -231,34 +196,20 @@ public class ForwardingService extends IntentService {
             completionService.submit(ruleForwarder);
         }
 
-            // Build and send an Event.
-        tracker.send(new HitBuilders.EventBuilder()
-                .setCategory(CATEGORY_FORWARDING)
-                .setAction(ACTION_START_FORWARDING)
-                .setLabel(ruleModels.size() + " rules")
-                .build());
-
-
+        int remainingFutures = ruleModelForwarders.size();
         Future<?> completedFuture;
 
-        // loop through each callback, and handle an exception
         while (remainingFutures > 0 && runService) {
-
-            // block until a callable completes
             try {
                 completedFuture = completionService.take();
                 remainingFutures--;
 
                 completedFuture.get();
             } catch (ExecutionException e) {
-                Throwable cause = e.getCause();
-
                 Log.e(TAG, "Error when forwarding port.", e);
                 localIntent =
                         new Intent(BROADCAST_ACTION)
-                                // Puts the status into the Intent
                                 .putExtra(PORT_FORWARD_SERVICE_ERROR_MESSAGE, e.getCause().getMessage());
-                // Broadcasts the Intent to receivers in this app.
                 LocalBroadcastManager.getInstance(this).sendBroadcast(localIntent);
 
                 break;
@@ -266,6 +217,22 @@ public class ForwardingService extends IntentService {
                 e.printStackTrace();
             }
         }
+
+        return START_STICKY;
+    }
+
+    private void startFloatingWindow() {
+        Intent intent = new Intent(this, FloatingWindowService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent);
+        } else {
+            startService(intent);
+        }
+    }
+
+    private void stopFloatingWindow() {
+        Intent intent = new Intent(this, FloatingWindowService.class);
+        stopService(intent);
     }
 
     private InetSocketAddress generateFromIpUsingInterface(String interfaceName, int port) throws SocketException, ObjectNotFoundException {
@@ -309,11 +276,7 @@ public class ForwardingService extends IntentService {
         Log.i(TAG, "onTaskRemoved: called");
 
         // Build and send an Event.
-        tracker.send(new HitBuilders.EventBuilder()
-                .setCategory(CATEGORY_FORWARDING)
-                .setAction(ACTION_STOP_FORWARDING)
-                .setLabel("Task Removed")
-                .build());
+        
 
         this.onDestroy();
     }
@@ -323,7 +286,8 @@ public class ForwardingService extends IntentService {
         super.onDestroy();
         runService = false;
 
-        // Reject any new tasks
+        stopFloatingWindow();
+
         executorService.shutdown();
 
         try {
@@ -354,11 +318,7 @@ public class ForwardingService extends IntentService {
         wakeLock.release();
 
         // Build and send an Event.
-        tracker.send(new HitBuilders.EventBuilder()
-                .setCategory(CATEGORY_FORWARDING)
-                .setAction(ACTION_STOP_FORWARDING)
-                .setLabel("Ended")
-                .build());
+        
         Log.i(TAG, "Ended the ForwardingService. Cleanup finished.");
     }
 
@@ -370,31 +330,33 @@ public class ForwardingService extends IntentService {
         mNotificationManager.cancel(NOTIFICATION_ID);
     }
 
-    /**
-     * Construct a notification
-     */
-    private void showForwardingEnabledNotification() {
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Forwarding Service",
+                    NotificationManager.IMPORTANCE_LOW
+            );
+            channel.setDescription("Shows when port forwarding is active");
+
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
+        }
+    }
+
+    private Notification createNotification() {
         NotificationCompat.Builder mBuilder =
-                new NotificationCompat.Builder(this)
+                new NotificationCompat.Builder(this, CHANNEL_ID)
                         .setSmallIcon(R.drawable.ic_fwd_24dp)
                         .setContentTitle(getString(R.string.notification_forwarding_active_title))
                         .setContentText(getString(R.string.notification_forwarding_touch_disable_text));
 
         mBuilder.setColor(ContextCompat.getColor(this, R.color.colorPrimaryDark));
 
-        // Creates an explicit intent for an Activity in your app
         Intent resultIntent = new Intent(this, MainActivity.class);
 
-        // The stack builder object will contain an artificial back stack for the
-        // started Activity.
-        // This ensures that navigating backward from the Activity leads out of
-        // your application to the Home screen.
         TaskStackBuilder stackBuilder = TaskStackBuilder.create(this);
-
-        // Adds the back stack for the Intent (but not the Intent itself)
         stackBuilder.addParentStack(MainActivity.class);
-
-        // Adds the Intent that starts the Activity to the top of the stack
         stackBuilder.addNextIntent(resultIntent);
         PendingIntent resultPendingIntent =
                 stackBuilder.getPendingIntent(
@@ -402,13 +364,24 @@ public class ForwardingService extends IntentService {
                         PendingIntent.FLAG_UPDATE_CURRENT
                 );
         mBuilder.setContentIntent(resultPendingIntent);
-        NotificationManager mNotificationManager =
-                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
         Notification notification = mBuilder.build();
         notification.flags = Notification.FLAG_NO_CLEAR | Notification.FLAG_ONGOING_EVENT | Notification.DEFAULT_LIGHTS;
 
-        // mId allows you to update the notification later on.
+        return notification;
+    }
+
+    private void showForwardingEnabledNotification() {
+        createNotificationChannel();
+        Notification notification = createNotification();
+
+        NotificationManager mNotificationManager =
+                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         mNotificationManager.notify(NOTIFICATION_ID, notification);
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
     }
 }
