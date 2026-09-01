@@ -2,7 +2,15 @@
 
 buildscript {
     repositories {
-        jcenter()
+        maven {
+            url 'https://maven.aliyun.com/repository/google'
+        }
+        maven {
+            url 'https://maven.aliyun.com/repository/central'
+        }
+        maven {
+            url 'https://maven.aliyun.com/repository/gradle-plugin'
+        }
         google()
         maven {
             url 'https://maven.fabric.io/public'
@@ -20,7 +28,15 @@ buildscript {
 
 allprojects {
     repositories {
-        jcenter()
+        maven {
+            url 'https://maven.aliyun.com/repository/google'
+        }
+        maven {
+            url 'https://maven.aliyun.com/repository/central'
+        }
+        maven {
+            url 'https://maven.aliyun.com/repository/gradle-plugin'
+        }
         maven {
             url 'https://maven.google.com'
         }
