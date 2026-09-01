@@ -13,6 +13,7 @@ import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.IBinder;
+import android.util.Log;import android.provider.Settings;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.view.Gravity;
@@ -29,7 +30,7 @@ public class FloatingWindowService extends Service {
 
     private static final String CHANNEL_ID = "floating_window_channel";
     private static final int NOTIFICATION_ID = 2;
-    private static final String BROADCAST_ACTION = "com.elixsr.portforwarder.forwarding.ForwardingService.BROADCAST";
+    private static final String TAG = "FloatingWindowService";    private static final String BROADCAST_ACTION = "com.elixsr.portforwarder.forwarding.ForwardingService.BROADCAST";
 
     private WindowManager windowManager;
     private View floatingView;
@@ -65,6 +66,12 @@ public class FloatingWindowService extends Service {
     }
 
     private void addFloatingBall() {
+        // 检查悬浮窗权限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            Log.w(TAG, "悬浮窗权限未授予，跳过添加悬浮球");
+            return;
+        }
+
         floatingView = LayoutInflater.from(this).inflate(R.layout.floating_window, null);
 
         int layoutType;

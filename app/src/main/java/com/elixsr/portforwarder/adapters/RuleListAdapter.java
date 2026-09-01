@@ -37,9 +37,6 @@ import com.elixsr.portforwarder.forwarding.ForwardingManager;
 import com.elixsr.portforwarder.R;
 import com.elixsr.portforwarder.models.RuleModel;
 import com.elixsr.portforwarder.ui.rules.EditRuleActivity;
-import com.google.android.gms.ads.AdRequest;
-import com.google.android.gms.ads.AdSize;
-import com.google.android.gms.ads.AdView;
 
 /**
  * Created by Niall McShane on 01/03/2016.
@@ -50,36 +47,9 @@ public class RuleListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
     private List<ListItem> listItems;
     private ForwardingManager forwardingManager;
 
-    protected static final int AD_VIEW = 1;
     protected static final int RULE_VIEW = 0;
 
 
-    public static class AdViewHolder extends RecyclerView.ViewHolder {
-
-        public static final String DARK_AD_ID = "ca-app-pub-9546697987163387/1828769767";
-        public static final String LIGHT_AD_ID = "ca-app-pub-9546697987163387/1828769767";
-        public static final String PREF_DARK_THEME = "pref_dark_theme";
-
-        public AdViewHolder(View v) {
-            super(v);
-
-            AdRequest request = new AdRequest.Builder()
-                    .addTestDevice(AdRequest.DEVICE_ID_EMULATOR)
-                    .build();
-            AdView adView = new AdView(v.getContext());
-            adView.setAdSize(AdSize.SMART_BANNER);
-
-            // Load ad type based on theme - dark or light
-            if (PreferenceManager.getDefaultSharedPreferences(v.getContext())
-                    .getBoolean(PREF_DARK_THEME, false)) {
-                adView.setAdUnitId(DARK_AD_ID);
-            } else {
-                adView.setAdUnitId(LIGHT_AD_ID);
-            }
-            ((LinearLayout) v).addView(adView, 1);
-            adView.loadAd(request);
-        }
-    }
 
     // Provide a reference to the views for each data item
     // Complex data items may need more than one view per item, and
@@ -134,9 +104,7 @@ public class RuleListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
         if (!(PreferenceManager.getDefaultSharedPreferences(context)
                 .getBoolean("disable_ads_key", false))) {
             if (ruleModels.size() > 3) {
-                this.listItems.add(3, new ListItem(AD_VIEW));
             } else {
-                this.listItems.add(new ListItem(AD_VIEW));
             }
         }
 
@@ -157,7 +125,6 @@ public class RuleListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
             case 0:
                 return new RuleViewHolder(view, forwardingManager);
             case 1:
-                return new AdViewHolder(adView);
         }
 
         return new RuleViewHolder(view, forwardingManager);
@@ -188,9 +155,6 @@ public class RuleListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolde
                 ruleHolder.ruleNameText.setText(ruleModel.getName());
                 ruleHolder.ruleFromPortText.setText(String.valueOf(ruleModel.getFromPort()));
                 ruleHolder.ruleTargetPortText.setText(String.valueOf(ruleModel.getTarget().getPort()));
-                break;
-            case AD_VIEW:
-                AdViewHolder adHolder = (AdViewHolder) holder;
                 break;
         }
     }

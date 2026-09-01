@@ -60,7 +60,6 @@ public abstract class BaseWebActivity extends BaseActivity {
         webView.setBackgroundColor(Color.TRANSPARENT);
         webView.setWebViewClient(new MyWebViewClient());
         webView.getSettings().setJavaScriptEnabled(true);
-        webView.getSettings().setAppCacheEnabled(false);
         webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
 
         // Hardware acceleration for web view

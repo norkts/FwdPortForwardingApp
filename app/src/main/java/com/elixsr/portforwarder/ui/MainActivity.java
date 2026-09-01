@@ -24,7 +24,9 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
+import android.net.Uri;
+import android.os.Build;
+import android.provider.Settings;import android.preference.PreferenceManager;
 import android.support.design.widget.CoordinatorLayout;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -97,6 +99,12 @@ public class MainActivity extends BaseActivity {
         // Determine if this is first start - and whether to show app intro
         onFirstStart();
 
+    // 检查悬浮窗权限
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+        Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            Uri.parse("package:" + getPackageName()));
+        startActivityForResult(intent, 1001);
+    }
         final Intent newRuleIntent = new Intent(this, NewRuleActivity.class);
 
         // Move to the new rule activity

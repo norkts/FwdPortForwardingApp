@@ -42,8 +42,6 @@ import com.elixsr.portforwarder.models.RuleModel;
 import com.elixsr.portforwarder.db.RuleDbHelper;
 import com.elixsr.portforwarder.ui.MainActivity;
 import com.elixsr.portforwarder.util.RuleHelper;
-import com.google.android.gms.analytics.HitBuilders;
-import com.google.android.gms.analytics.Tracker;
 import com.google.firebase.analytics.FirebaseAnalytics;
 
 /**
@@ -67,8 +65,7 @@ public class EditRuleActivity extends BaseRuleActivity {
     private long ruleModelId;
 
     private SQLiteDatabase db;
-    private Tracker tracker;
-    private SwitchBar switchBar;
+        private SwitchBar switchBar;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -165,7 +162,6 @@ public class EditRuleActivity extends BaseRuleActivity {
 
         // Set up tracking
         // Get tracker.
-        tracker = ((FwdApplication) this.getApplication()).getDefaultTracker();
     }
 
     @Override
@@ -231,11 +227,7 @@ public class EditRuleActivity extends BaseRuleActivity {
             db.close();
 
             // Build and send an Event.
-            tracker.send(new HitBuilders.EventBuilder()
-                    .setCategory(CATEGORY_RULES)
-                    .setAction(ACTION_SAVE)
-                    .setLabel(LABEL_UPDATE_RULE)
-                    .build());
+            
 
 
             // Move to main activity
@@ -277,11 +269,7 @@ public class EditRuleActivity extends BaseRuleActivity {
                         db.close();
 
                         // Build and send an Event.
-                        tracker.send(new HitBuilders.EventBuilder()
-                                .setCategory(CATEGORY_RULES)
-                                .setAction(ACTION_DELETE)
-                                .setLabel(LABEL_DELETE_RULE)
-                                .build());
+                        
 
                         // Move to main activity
                         Intent mainActivityIntent = new Intent(getBaseContext(), MainActivity.class);
