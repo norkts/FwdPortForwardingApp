@@ -168,7 +168,7 @@ public class MainActivity extends BaseActivity {
 
     @Override
     public void onResume() {
-    
+    super.onResume();    
         this.ruleModels.clear();
         this.ruleModels.addAll(ruleDao.getAllRuleModels());
         this.ruleListAdapter.notifyDataSetChanged();
