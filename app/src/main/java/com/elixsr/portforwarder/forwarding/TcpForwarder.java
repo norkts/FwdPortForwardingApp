@@ -73,6 +73,7 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
             }
 
             listening.register(selector, SelectionKey.OP_ACCEPT, listening);
+            Log.i(TAG, "TCP listening on port " + from.getPort() + ", forwarding to " + to.getPort());
 
             while (true) {
 
@@ -162,13 +163,14 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
             System.out.println("Connection closed: " + key.channel());
         }
         if (r <= 0) {
+            Log.i(TAG, "TCP connection closed (no data), bytes read: " + r);
             pair.from.close();
             pair.to.close();
             key.cancel();
-            System.out.println("Connection closed: " + key.channel());
         } else {
             readBuffer.flip();
-            pair.to.write(readBuffer);
+            int bytesForwarded = pair.to.write(readBuffer);
+            Log.d(TAG, "TCP forwarded " + bytesForwarded + " bytes from " + pair.from.socket().getRemoteSocketAddress() + " to " + pair.to.socket().getRemoteSocketAddress());
 
             if (readBuffer.remaining() > 0) {
                 pair.writeBuffer.put(readBuffer);
@@ -183,6 +185,7 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
         SocketChannel forwardToSocket = (SocketChannel) key.channel();
 
         forwardToSocket.finishConnect();
+        Log.i(TAG, "TCP connection established to " + forwardToSocket.socket().getRemoteSocketAddress());
         forwardToSocket.socket().setTcpNoDelay(true);
         registerReads(key.selector(), from, forwardToSocket);
     }
@@ -191,7 +194,7 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
             SelectionKey key,
             InetSocketAddress forwardToAddress) throws IOException {
         SocketChannel from = ((ServerSocketChannel) key.attachment()).accept();
-        System.out.println("Accepted " + from.socket());
+        Log.i(TAG, "TCP accepted connection from " + from.socket().getRemoteSocketAddress());
         from.socket().setTcpNoDelay(true);
         from.configureBlocking(false);
 
@@ -216,6 +219,7 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
                 selector.close();
             }
             if (listening != null && listening.isOpen()) {
+                Log.i(TAG, "TCP closing listening socket on port " + from.getPort());
                 listening.close();
             }
         } catch (Exception e) {

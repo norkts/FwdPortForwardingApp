@@ -141,6 +141,7 @@ public class ForwardingService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
 
+        Log.i(TAG, "========== FORWARDING SERVICE START ==========");
         Log.i(TAG, "Ran the service");
 
         ForwardingManager.getInstance().enableForwarding();
@@ -168,6 +169,7 @@ public class ForwardingService extends Service {
     private void startForwardingRules() {
         RuleDao ruleDao = new RuleDao(new RuleDbHelper(this));
         List<RuleModel> ruleModels = ruleDao.getAllEnabledRuleModels();
+        Log.i(TAG, "Loaded " + ruleModels.size() + " forwarding rules");
 
         List<Forwarder> ruleModelForwarders = new ArrayList<>();
 
@@ -180,12 +182,15 @@ public class ForwardingService extends Service {
 
             try {
                 from = generateFromIpUsingInterface(ruleModel.getFromInterfaceName(), ruleModel.getFromPort());
+                Log.i(TAG, "Rule '" + ruleModel.getName() + "': from " + from.getPort() + " to " + ruleModel.getTarget().getPort());
 
                 if (ruleModel.isTcp() && runService) {
+                    Log.i(TAG, "  -> TCP forwarder");
                     ruleModelForwarders.add(new TcpForwarder(from, ruleModel.getTarget(), ruleModel.getName()));
                 }
 
                 if (ruleModel.isUdp() && runService) {
+                    Log.i(TAG, "  -> UDP forwarder");
                     ruleModelForwarders.add(new UdpForwarder(from, ruleModel.getTarget(), ruleModel.getName()));
                 }
 
@@ -318,6 +323,8 @@ public class ForwardingService extends Service {
 
         hideForwardingEnabledNotification();
 
+        Log.i(TAG, "========== FORWARDING SERVICE STOP ==========");
+        
         //update the main activity
         Intent localIntent =
                 new Intent(BROADCAST_ACTION)

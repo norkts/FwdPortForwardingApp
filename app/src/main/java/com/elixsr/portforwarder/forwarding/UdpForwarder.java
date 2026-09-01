@@ -70,6 +70,7 @@ public class UdpForwarder extends Forwarder implements Callable<Void> {
 
             selector = Selector.open();
             registerResource(selector);            inChannel.register(selector, SelectionKey.OP_READ, new ClientRecord(to));
+            Log.i(TAG, "UDP listening on port " + from.getPort() + ", forwarding to " + to.getPort());
 
             while (true) { // Run forever, receiving and echoing datagrams
 
@@ -150,6 +151,7 @@ public class UdpForwarder extends Forwarder implements Callable<Void> {
         ClientRecord clientRecord = (ClientRecord) key.attachment();
         clientRecord.writeBuffer.flip(); // Prepare buffer for sending
         int bytesSent = channel.send(clientRecord.writeBuffer, clientRecord.toAddress);
+        Log.d(TAG, "UDP sent " + bytesSent + " bytes to " + clientRecord.toAddress);
 
 
         if (clientRecord.writeBuffer.remaining() > 0) {
@@ -174,6 +176,7 @@ public class UdpForwarder extends Forwarder implements Callable<Void> {
                 selector.close();
             }
             if (inChannel != null && inChannel.isOpen()) {
+                Log.i(TAG, "UDP closing channel on port " + from.getPort());
                 inChannel.close();
             }
         } catch (Exception e) {
