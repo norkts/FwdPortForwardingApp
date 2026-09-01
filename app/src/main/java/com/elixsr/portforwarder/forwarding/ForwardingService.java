@@ -304,6 +304,9 @@ public class ForwardingService extends Service {
 
         stopFloatingWindow();
 
+        // 先关闭所有打开的端口资源，确保端口能够释放
+        Forwarder.closeAllResources();
+
         executorService.shutdown();
 
         try {
@@ -319,8 +322,7 @@ public class ForwardingService extends Service {
             Thread.currentThread().interrupt();
         }
 
-        // 关闭所有打开的端口
-        Forwarder.closeAllResources();        ForwardingManager.getInstance().disableForwarding();
+        ForwardingManager.getInstance().disableForwarding();
 
         hideForwardingEnabledNotification();
 

@@ -79,39 +79,44 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
             listening.register(selector, SelectionKey.OP_ACCEPT, listening);
             LogBuffer.getInstance().i(TAG, "TCP listening on port " + from.getPort() + ", forwarding to " + to.getPort());
 
-            while (true) {
+            try {
+                while (true) {
 
-                if (Thread.currentThread().isInterrupted()) {
-                    LogBuffer.getInstance().i(TAG, String.format(super.THREAD_INTERRUPT_CLEANUP_MESSAGE, protocol));
-                    listening.close();
-                    break;
-                }
+                    if (Thread.currentThread().isInterrupted()) {
+                        LogBuffer.getInstance().i(TAG, String.format(super.THREAD_INTERRUPT_CLEANUP_MESSAGE, protocol));
+                        break;
+                    }
 
-                int count = selector.select();
-                if (count > 0) {
-                    Iterator<SelectionKey> it = selector.selectedKeys().iterator();
-                    while (it.hasNext()) {
+                    int count = selector.select();
+                    if (count > 0) {
+                        Iterator<SelectionKey> it = selector.selectedKeys().iterator();
+                        while (it.hasNext()) {
 
-                        SelectionKey key = it.next();
-                        it.remove();
+                            SelectionKey key = it.next();
+                            it.remove();
 
-                        if (key.isValid() && key.isAcceptable()) {
-                            processAcceptable(key, to);
-                        }
+                            if (key.isValid() && key.isAcceptable()) {
+                                processAcceptable(key, to);
+                            }
 
-                        if (key.isValid() && key.isConnectable()) {
-                            processConnectable(key);
-                        }
+                            if (key.isValid() && key.isConnectable()) {
+                                processConnectable(key);
+                            }
 
-                        if (key.isValid() && key.isReadable()) {
-                            processReadable(key, readBuffer);
-                        }
+                            if (key.isValid() && key.isReadable()) {
+                                processReadable(key, readBuffer);
+                            }
 
-                        if (key.isValid() && key.isWritable()) {
-                            processWritable(key);
+                            if (key.isValid() && key.isWritable()) {
+                                processWritable(key);
+                            }
                         }
                     }
                 }
+            } finally {
+                // 确保资源被正确清理
+                LogBuffer.getInstance().i(TAG, "TCP cleaning up resources on port " + from.getPort());
+                close();
             }
         } catch (IOException e) {
             LogBuffer.getInstance().e(TAG, "Problem opening Selector", e);
