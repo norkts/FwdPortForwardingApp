@@ -50,6 +50,7 @@ import com.elixsr.portforwarder.forwarding.ForwardingManager;
 import com.elixsr.portforwarder.forwarding.ForwardingService;
 import com.elixsr.portforwarder.models.RuleModel;
 import com.elixsr.portforwarder.adapters.RuleListAdapter;
+import com.elixsr.portforwarder.util.LogViewerManager;
 import com.elixsr.portforwarder.ui.intro.MainIntro;
 import com.elixsr.portforwarder.ui.preferences.HelpActivity;
 import com.elixsr.portforwarder.ui.preferences.SettingsActivity;
@@ -77,6 +78,7 @@ public class MainActivity extends BaseActivity {
     private Intent forwardingServiceIntent;
     private RuleDao ruleDao;
     private PercentRelativeLayout mRuleListEmptyView;
+    private LogViewerManager logViewerManager;
 
     
 
@@ -96,6 +98,9 @@ public class MainActivity extends BaseActivity {
         // Obtain the FirebaseAnalytics instance.
         
 
+        // 初始化日志查看器
+        logViewerManager = new LogViewerManager(this);
+        
         // Determine if this is first start - and whether to show app intro
         onFirstStart();
 
@@ -233,6 +238,11 @@ public class MainActivity extends BaseActivity {
         int id = item.getItemId();
 
         switch (id) {
+            case R.id.action_view_logs:
+                if (logViewerManager != null) {
+                    logViewerManager.showLogDialog();
+                }
+                break;
             case R.id.action_settings:
                 Intent prefIntent = new Intent(this, SettingsActivity.class);
                 startActivity(prefIntent);
