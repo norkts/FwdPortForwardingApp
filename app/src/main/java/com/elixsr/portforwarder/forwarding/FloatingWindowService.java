@@ -82,8 +82,8 @@ public class FloatingWindowService extends Service {
         }
 
         params = new WindowManager.LayoutParams(
-                150,
-                150,
+                40,
+                40,
                 layoutType,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT

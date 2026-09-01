@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="50dp"
-    android:layout_height="50dp"
+    android:layout_width="40dp"
+    android:layout_height="40dp"
     android:background="@drawable/floating_ball_background"
     android:orientation="vertical"
     android:gravity="center"
@@ -10,8 +10,8 @@
 
     <ImageView
         android:id="@+id/floating_icon"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
         android:src="@drawable/ic_fwd_24dp" />
 
 </LinearLayout>

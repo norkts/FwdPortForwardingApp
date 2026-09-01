@@ -43,6 +43,8 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
     private static final String TAG = "TcpForwarder";
     private static final int BUFFER_SIZE = 100000;
 
+    private Selector selector;
+    private ServerSocketChannel listening;
     public TcpForwarder(InetSocketAddress form, InetSocketAddress to, String ruleName) {
         super("TCP", form, to, ruleName);
     }
@@ -52,12 +54,13 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
         Log.d(TAG, String.format(super.START_MESSAGE, protocol, from.getPort(), to.getPort()));
 
         try {
-            Selector selector = Selector.open();
+            selector = Selector.open();
 
+            registerResource(selector);
             ByteBuffer readBuffer = ByteBuffer.allocate(BUFFER_SIZE);
 
-            ServerSocketChannel listening = ServerSocketChannel.open();
-            listening.configureBlocking(false);
+            listening = ServerSocketChannel.open();
+            registerResource(listening);            listening.configureBlocking(false);
 
             try {
                 listening.socket().bind(this.from, 0);
@@ -204,7 +207,21 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
         }
     }
 
-    static class RoutingPair {
+
+    @Override
+    public void close() {
+        isRunning = false;
+        try {
+            if (selector != null && selector.isOpen()) {
+                selector.close();
+            }
+            if (listening != null && listening.isOpen()) {
+                listening.close();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error closing TcpForwarder resources", e);
+        }
+    }    static class RoutingPair {
         SocketChannel from;
         SocketChannel to;
         ByteBuffer writeBuffer = ByteBuffer.allocate(BUFFER_SIZE);

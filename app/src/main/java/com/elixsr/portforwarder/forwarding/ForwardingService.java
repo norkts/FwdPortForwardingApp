@@ -313,7 +313,8 @@ public class ForwardingService extends Service {
             Thread.currentThread().interrupt();
         }
 
-        ForwardingManager.getInstance().disableForwarding();
+        // 关闭所有打开的端口
+        Forwarder.closeAllResources();        ForwardingManager.getInstance().disableForwarding();
 
         hideForwardingEnabledNotification();
 

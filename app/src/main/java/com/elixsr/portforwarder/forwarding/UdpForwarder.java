@@ -45,6 +45,8 @@ public class UdpForwarder extends Forwarder implements Callable<Void> {
 
     private static final int TIMEOUT = 3000; // Wait timeout (milliseconds)
 
+    private DatagramChannel inChannel;
+    private Selector selector;
     public UdpForwarder(InetSocketAddress form, InetSocketAddress to, String ruleName) {
         super("UDP", form, to, ruleName);
     }
@@ -56,8 +58,8 @@ public class UdpForwarder extends Forwarder implements Callable<Void> {
         try {
             ByteBuffer readBuffer = ByteBuffer.allocate(BUFFER_SIZE);
 
-            DatagramChannel inChannel = DatagramChannel.open();
-            inChannel.configureBlocking(false);
+            inChannel = DatagramChannel.open();
+            registerResource(inChannel);            inChannel.configureBlocking(false);
 
             try {
                 inChannel.socket().bind(this.from);
@@ -66,8 +68,8 @@ public class UdpForwarder extends Forwarder implements Callable<Void> {
                 throw new BindException(String.format(super.BIND_FAILED_MESSAGE, from.getPort(), protocol, ruleName), e);
             }
 
-            Selector selector = Selector.open();
-            inChannel.register(selector, SelectionKey.OP_READ, new ClientRecord(to));
+            selector = Selector.open();
+            registerResource(selector);            inChannel.register(selector, SelectionKey.OP_READ, new ClientRecord(to));
 
             while (true) { // Run forever, receiving and echoing datagrams
 
@@ -163,7 +165,21 @@ public class UdpForwarder extends Forwarder implements Callable<Void> {
 //        }
     }
 
-    static class ClientRecord {
+
+    @Override
+    public void close() {
+        isRunning = false;
+        try {
+            if (selector != null && selector.isOpen()) {
+                selector.close();
+            }
+            if (inChannel != null && inChannel.isOpen()) {
+                inChannel.close();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error closing UdpForwarder resources", e);
+        }
+    }    static class ClientRecord {
         public SocketAddress toAddress;
         public ByteBuffer writeBuffer = ByteBuffer.allocate(BUFFER_SIZE);
 

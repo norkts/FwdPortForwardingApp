@@ -18,8 +18,12 @@
 
 package com.elixsr.portforwarder.forwarding;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.channels.Channel;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * The {@link Forwarder} class represents all details shared by a protocol forwarding class.
@@ -44,6 +48,11 @@ public abstract class Forwarder implements Callable<Void> {
     public static final String THREAD_INTERRUPT_CLEANUP_MESSAGE = "%s Thread interrupted, will perform cleanup";
 
     /**
+     * 全局跟踪所有打开的资源，用于在停止时释放端口
+     */
+    private static final CopyOnWriteArrayList<Closeable> openResources = new CopyOnWriteArrayList<>();
+
+    /**
      * The from and target {@link InetSocketAddress} objects.
      */
     protected final InetSocketAddress from, to;
@@ -58,10 +67,57 @@ public abstract class Forwarder implements Callable<Void> {
      */
     protected final String protocol;
 
+    /**
+     * 标记转发器是否正在运行
+     */
+    protected volatile boolean isRunning = true;
+
     public Forwarder(String protocol, InetSocketAddress form, InetSocketAddress to, String ruleName) {
         this.protocol = protocol;
         this.from = form;
         this.to = to;
         this.ruleName = ruleName;
+    }
+
+    /**
+     * 注册资源以便在停止时关闭
+     */
+    protected void registerResource(Closeable resource) {
+        openResources.addIfAbsent(resource);
+    }
+
+    /**
+     * 注销资源
+     */
+    protected void unregisterResource(Closeable resource) {
+        openResources.remove(resource);
+    }
+
+    /**
+     * 关闭所有打开的资源，释放端口
+     */
+    public static void closeAllResources() {
+        for (Closeable resource : openResources) {
+            try {
+                if (resource != null) {
+                    resource.close();
+                }
+            } catch (IOException e) {
+                // 忽略关闭时的异常
+            }
+        }
+        openResources.clear();
+    }
+
+    /**
+     * 关闭转发器，释放所有资源和端口
+     */
+    public abstract void close();
+
+    /**
+     * 检查转发器是否正在运行
+     */
+    public boolean isRunning() {
+        return isRunning;
     }
 }
