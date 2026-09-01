@@ -6,6 +6,9 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".FwdApplication"
@@ -15,9 +18,7 @@
         android:persistent="true"
         android:supportsRtl="true"
         android:theme="@style/AppTheme.NoActionBar">
-        <activity
-            android:name=".ui.MainActivity"
-            android:label="@string/app_tag">
+        <activity android:name=".ui.MainActivity" android:label="@string/app_tag" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -75,49 +76,19 @@
         <service
             android:name=".forwarding.ForwardingService"
             android:exported="false"
-            android:label="Forwarding Service" />
+            android:label="Forwarding Service"
+            android:stopWithTask="false" />
 
-        <receiver
-            android:name=".forwarding.StartForwardingServiceAtBootReceiver"
-            android:label="StartForwardingServiceAtBootReceiver">
+        <service
+            android:name=".forwarding.FloatingWindowService"
+            android:exported="false"
+            android:label="Floating Window Service" />
+
+        <receiver android:name=".forwarding.StartForwardingServiceAtBootReceiver" android:label="StartForwardingServiceAtBootReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
-
-        <!-- Analytics -->
-
-
-        <!--
-      Optionally, register AnalyticsReceiver and AnalyticsService to support background
-      dispatching on non-Google Play devices
-        -->
-        <receiver
-            android:name="com.google.android.gms.analytics.AnalyticsReceiver"
-            android:enabled="true">
-            <intent-filter>
-                <action android:name="com.google.android.gms.analytics.ANALYTICS_DISPATCH" />
-            </intent-filter>
-        </receiver>
-
-        <service
-            android:name="com.google.android.gms.analytics.AnalyticsService"
-            android:enabled="true"
-            android:exported="false" />
-
-        <!--
-             Optionally, register CampaignTrackingReceiver and CampaignTrackingService to enable
-             installation campaign reporting
-        -->
-        <receiver
-            android:name="com.google.android.gms.analytics.CampaignTrackingReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.android.vending.INSTALL_REFERRER" />
-            </intent-filter>
-        </receiver>
-
-        <service android:name="com.google.android.gms.analytics.CampaignTrackingService" />
 
         <activity
             android:name=".ui.preferences.AdvancedSettingsActivity"
@@ -135,9 +106,7 @@
                 android:resource="@xml/provider_paths" />
         </provider>
 
-        <activity
-            android:name=".ui.preferences.ImportRulesActivity"
-            android:label="@string/title_activity_import_export_rules">
+        <activity android:name=".ui.preferences.ImportRulesActivity" android:label="@string/title_activity_import_export_rules" android:exported="true">
         </activity>
         <activity
             android:name=".ui.preferences.SupportSiteActivity"
