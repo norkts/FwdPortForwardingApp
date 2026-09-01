@@ -169,7 +169,6 @@ public class MainActivity extends BaseActivity {
     @Override
     public void onResume() {
     
-    ForwardingManager.getInstance().init(this);        super.onResume();
         this.ruleModels.clear();
         this.ruleModels.addAll(ruleDao.getAllRuleModels());
         this.ruleListAdapter.notifyDataSetChanged();
