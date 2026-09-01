@@ -19,6 +19,7 @@
 package com.elixsr.portforwarder.forwarding;
 
 import android.util.Log;
+import com.elixsr.portforwarder.util.LogBuffer;
 
 import com.elixsr.portforwarder.exceptions.BindException;
 
@@ -53,7 +54,7 @@ public class UdpForwarder extends Forwarder implements Callable<Void> {
 
     public Void call() throws IOException, BindException {
 
-        Log.d(TAG, String.format(super.START_MESSAGE, protocol, from.getPort(), to.getPort()));
+        LogBuffer.getInstance().d(TAG, String.format(super.START_MESSAGE, protocol, from.getPort(), to.getPort()));
 
         try {
             ByteBuffer readBuffer = ByteBuffer.allocate(BUFFER_SIZE);
@@ -64,18 +65,18 @@ public class UdpForwarder extends Forwarder implements Callable<Void> {
             try {
                 inChannel.socket().bind(this.from);
             } catch (SocketException e) {
-                Log.e(TAG, String.format(super.BIND_FAILED_MESSAGE, from.getPort(), protocol, ruleName), e);
+                LogBuffer.getInstance().e(TAG, String.format(super.BIND_FAILED_MESSAGE, from.getPort(), protocol, ruleName), e);
                 throw new BindException(String.format(super.BIND_FAILED_MESSAGE, from.getPort(), protocol, ruleName), e);
             }
 
             selector = Selector.open();
             registerResource(selector);            inChannel.register(selector, SelectionKey.OP_READ, new ClientRecord(to));
-            Log.i(TAG, "UDP listening on port " + from.getPort() + ", forwarding to " + to.getPort());
+            LogBuffer.getInstance().i(TAG, "UDP listening on port " + from.getPort() + ", forwarding to " + to.getPort());
 
             while (true) { // Run forever, receiving and echoing datagrams
 
                 if (Thread.currentThread().isInterrupted()) {
-                    Log.i(TAG, String.format(super.THREAD_INTERRUPT_CLEANUP_MESSAGE, protocol));
+                    LogBuffer.getInstance().i(TAG, String.format(super.THREAD_INTERRUPT_CLEANUP_MESSAGE, protocol));
                     inChannel.socket().close();
                     break;
                 }
@@ -91,14 +92,14 @@ public class UdpForwarder extends Forwarder implements Callable<Void> {
 
                         // Client socket channel has pending data?
                         if (key.isReadable()) {
-                            // Log.i(TAG, "Have Something to READ");
+                            // LogBuffer.getInstance().i(TAG, "Have Something to READ");
                             handleRead(key, readBuffer);
                         }
 
                         // Client socket channel is available for writing and
                         // key is valid (i.e., channel not closed).
                         if (key.isValid() && key.isWritable()) {
-                            // Log.i(TAG, "Have Something to WRITE");
+                            // LogBuffer.getInstance().i(TAG, "Have Something to WRITE");
                             handleWrite(key);
                         }
 
@@ -107,7 +108,7 @@ public class UdpForwarder extends Forwarder implements Callable<Void> {
                 }
             }
         } catch (IOException e) {
-            Log.e(TAG, "Problem opening Selector", e);
+            LogBuffer.getInstance().e(TAG, "Problem opening Selector", e);
             throw e;
         }
 
@@ -151,7 +152,7 @@ public class UdpForwarder extends Forwarder implements Callable<Void> {
         ClientRecord clientRecord = (ClientRecord) key.attachment();
         clientRecord.writeBuffer.flip(); // Prepare buffer for sending
         int bytesSent = channel.send(clientRecord.writeBuffer, clientRecord.toAddress);
-        Log.d(TAG, "UDP sent " + bytesSent + " bytes to " + clientRecord.toAddress);
+        LogBuffer.getInstance().d(TAG, "UDP sent " + bytesSent + " bytes to " + clientRecord.toAddress);
 
 
         if (clientRecord.writeBuffer.remaining() > 0) {
@@ -176,11 +177,11 @@ public class UdpForwarder extends Forwarder implements Callable<Void> {
                 selector.close();
             }
             if (inChannel != null && inChannel.isOpen()) {
-                Log.i(TAG, "UDP closing channel on port " + from.getPort());
+                LogBuffer.getInstance().i(TAG, "UDP closing channel on port " + from.getPort());
                 inChannel.close();
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error closing UdpForwarder resources", e);
+            LogBuffer.getInstance().e(TAG, "Error closing UdpForwarder resources", e);
         }
     }    static class ClientRecord {
         public SocketAddress toAddress;

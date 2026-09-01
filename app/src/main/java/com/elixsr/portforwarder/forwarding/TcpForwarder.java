@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.concurrent.Callable;
 
 import android.util.Log;
+import com.elixsr.portforwarder.util.LogBuffer;
 
 import com.elixsr.portforwarder.exceptions.BindException;
 
@@ -51,7 +52,7 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
 
     public Void call() throws IOException, BindException {
 
-        Log.d(TAG, String.format(super.START_MESSAGE, protocol, from.getPort(), to.getPort()));
+        LogBuffer.getInstance().d(TAG, String.format(super.START_MESSAGE, protocol, from.getPort(), to.getPort()));
 
         try {
             selector = Selector.open();
@@ -65,20 +66,20 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
             try {
                 listening.socket().bind(this.from, 0);
             } catch (java.net.BindException e) {
-                Log.e(TAG, String.format(super.BIND_FAILED_MESSAGE, from.getPort(), protocol, ruleName), e);
+                LogBuffer.getInstance().e(TAG, String.format(super.BIND_FAILED_MESSAGE, from.getPort(), protocol, ruleName), e);
                 throw new BindException(String.format(super.BIND_FAILED_MESSAGE, from.getPort(), protocol, ruleName), e);
             } catch (java.net.SocketException e) {
-                Log.e(TAG, String.format(super.BIND_FAILED_MESSAGE, from.getPort(), protocol, ruleName), e);
+                LogBuffer.getInstance().e(TAG, String.format(super.BIND_FAILED_MESSAGE, from.getPort(), protocol, ruleName), e);
                 throw new BindException(String.format(super.BIND_FAILED_MESSAGE, from.getPort(), protocol, ruleName), e);
             }
 
             listening.register(selector, SelectionKey.OP_ACCEPT, listening);
-            Log.i(TAG, "TCP listening on port " + from.getPort() + ", forwarding to " + to.getPort());
+            LogBuffer.getInstance().i(TAG, "TCP listening on port " + from.getPort() + ", forwarding to " + to.getPort());
 
             while (true) {
 
                 if (Thread.currentThread().isInterrupted()) {
-                    Log.i(TAG, String.format(super.THREAD_INTERRUPT_CLEANUP_MESSAGE, protocol));
+                    LogBuffer.getInstance().i(TAG, String.format(super.THREAD_INTERRUPT_CLEANUP_MESSAGE, protocol));
                     listening.close();
                     break;
                 }
@@ -110,7 +111,7 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
                 }
             }
         } catch (IOException e) {
-            Log.e(TAG, "Problem opening Selector", e);
+            LogBuffer.getInstance().e(TAG, "Problem opening Selector", e);
             throw e;
         }
 
@@ -163,14 +164,14 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
             System.out.println("Connection closed: " + key.channel());
         }
         if (r <= 0) {
-            Log.i(TAG, "TCP connection closed (no data), bytes read: " + r);
+            LogBuffer.getInstance().i(TAG, "TCP connection closed (no data), bytes read: " + r);
             pair.from.close();
             pair.to.close();
             key.cancel();
         } else {
             readBuffer.flip();
             int bytesForwarded = pair.to.write(readBuffer);
-            Log.d(TAG, "TCP forwarded " + bytesForwarded + " bytes from " + pair.from.socket().getRemoteSocketAddress() + " to " + pair.to.socket().getRemoteSocketAddress());
+            LogBuffer.getInstance().d(TAG, "TCP forwarded " + bytesForwarded + " bytes from " + pair.from.socket().getRemoteSocketAddress() + " to " + pair.to.socket().getRemoteSocketAddress());
 
             if (readBuffer.remaining() > 0) {
                 pair.writeBuffer.put(readBuffer);
@@ -185,7 +186,7 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
         SocketChannel forwardToSocket = (SocketChannel) key.channel();
 
         forwardToSocket.finishConnect();
-        Log.i(TAG, "TCP connection established to " + forwardToSocket.socket().getRemoteSocketAddress());
+        LogBuffer.getInstance().i(TAG, "TCP connection established to " + forwardToSocket.socket().getRemoteSocketAddress());
         forwardToSocket.socket().setTcpNoDelay(true);
         registerReads(key.selector(), from, forwardToSocket);
     }
@@ -194,7 +195,7 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
             SelectionKey key,
             InetSocketAddress forwardToAddress) throws IOException {
         SocketChannel from = ((ServerSocketChannel) key.attachment()).accept();
-        Log.i(TAG, "TCP accepted connection from " + from.socket().getRemoteSocketAddress());
+        LogBuffer.getInstance().i(TAG, "TCP accepted connection from " + from.socket().getRemoteSocketAddress());
         from.socket().setTcpNoDelay(true);
         from.configureBlocking(false);
 
@@ -219,11 +220,11 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
                 selector.close();
             }
             if (listening != null && listening.isOpen()) {
-                Log.i(TAG, "TCP closing listening socket on port " + from.getPort());
+                LogBuffer.getInstance().i(TAG, "TCP closing listening socket on port " + from.getPort());
                 listening.close();
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error closing TcpForwarder resources", e);
+            LogBuffer.getInstance().e(TAG, "Error closing TcpForwarder resources", e);
         }
     }    static class RoutingPair {
         SocketChannel from;

@@ -3,7 +3,6 @@ package com.elixsr.portforwarder.util;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
@@ -13,9 +12,6 @@ import android.widget.TextView;
 
 import com.elixsr.portforwarder.R;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-
 /**
  * 日志查看器管理器
  * 用于在应用内查看实时日志
@@ -23,7 +19,6 @@ import java.io.InputStreamReader;
 public class LogViewerManager {
 
     private static final long REFRESH_INTERVAL = 1000; // 1秒刷新一次
-    private static final String TAG_FILTER = "ForwardingService|TcpForwarder|UdpForwarder|FloatingWindowService";
 
     private Context context;
     private Dialog dialog;
@@ -33,12 +28,13 @@ public class LogViewerManager {
     private Handler handler;
     private boolean isAutoScroll = true;
     private boolean isRunning = false;
-    private StringBuilder logBuffer = new StringBuilder();
     private int lastLineCount = 0;
+    private LogBuffer logBuffer;
 
     public LogViewerManager(Context context) {
         this.context = context;
         this.handler = new Handler(Looper.getMainLooper());
+        this.logBuffer = LogBuffer.getInstance();
     }
 
     /**
@@ -121,55 +117,30 @@ public class LogViewerManager {
     }
 
     /**
-     * 刷新日志
+     * 刷新日志 - 从 LogBuffer 读取
      */
     private void refreshLogs() {
-        new Thread(new Runnable() {
+        final String logText = logBuffer.getAllLogs();
+
+        handler.post(new Runnable() {
             @Override
             public void run() {
-                try {
-                    // 执行 logcat 命令获取最新日志
-                    Process process = Runtime.getRuntime().exec(
-                            new String[]{"logcat", "-d", "-s", TAG_FILTER, "-v", "time"}
-                    );
-
-                    BufferedReader reader = new BufferedReader(
-                            new InputStreamReader(process.getInputStream())
-                    );
-
-                    StringBuilder newLogs = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        newLogs.append(line).append("\n");
+                if (logTextView != null) {
+                    if (logText.isEmpty()) {
+                        logTextView.setText("暂无日志\n\n提示：\n1. 启动转发服务会产生日志\n2. 日志会自动更新\n3. 可点击'刷新'手动更新");
+                    } else {
+                        logTextView.setText(logText);
                     }
 
-                    reader.close();
-                    process.destroy();
-
-                    final String logText = newLogs.toString();
-
-                    // 在 UI 线程更新
-                    handler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (logTextView != null) {
-                                logTextView.setText(logText);
-
-                                // 如果有新日志且开启自动滚动，则滚动到底部
-                                int lineCount = logText.split("\n").length;
-                                if (isAutoScroll && lineCount > lastLineCount) {
-                                    scrollToBottom();
-                                }
-                                lastLineCount = lineCount;
-                            }
-                        }
-                    });
-
-                } catch (Exception e) {
-                    e.printStackTrace();
+                    // 如果有新日志且开启自动滚动，则滚动到底部
+                    int lineCount = logText.isEmpty() ? 0 : logText.split("\n").length;
+                    if (isAutoScroll && lineCount > lastLineCount) {
+                        scrollToBottom();
+                    }
+                    lastLineCount = lineCount;
                 }
             }
-        }).start();
+        });
     }
 
     /**
@@ -179,6 +150,7 @@ public class LogViewerManager {
         if (logTextView != null) {
             logTextView.setText("");
             lastLineCount = 0;
+            logBuffer.clear();
         }
     }
 

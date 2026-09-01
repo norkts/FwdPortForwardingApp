@@ -33,6 +33,7 @@ import android.support.v4.app.TaskStackBuilder;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
+import com.elixsr.portforwarder.util.LogBuffer;
 
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -141,8 +142,8 @@ public class ForwardingService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
 
-        Log.i(TAG, "========== FORWARDING SERVICE START ==========");
-        Log.i(TAG, "Ran the service");
+        LogBuffer.getInstance().i(TAG, "========== FORWARDING SERVICE START ==========");
+        LogBuffer.getInstance().i(TAG, "Ran the service");
 
         ForwardingManager.getInstance().enableForwarding();
 
@@ -169,7 +170,7 @@ public class ForwardingService extends Service {
     private void startForwardingRules() {
         RuleDao ruleDao = new RuleDao(new RuleDbHelper(this));
         List<RuleModel> ruleModels = ruleDao.getAllEnabledRuleModels();
-        Log.i(TAG, "Loaded " + ruleModels.size() + " forwarding rules");
+        LogBuffer.getInstance().i(TAG, "Loaded " + ruleModels.size() + " forwarding rules");
 
         List<Forwarder> ruleModelForwarders = new ArrayList<>();
 
@@ -182,20 +183,20 @@ public class ForwardingService extends Service {
 
             try {
                 from = generateFromIpUsingInterface(ruleModel.getFromInterfaceName(), ruleModel.getFromPort());
-                Log.i(TAG, "Rule '" + ruleModel.getName() + "': from " + from.getPort() + " to " + ruleModel.getTarget().getPort());
+                LogBuffer.getInstance().i(TAG, "Rule '" + ruleModel.getName() + "': from " + from.getPort() + " to " + ruleModel.getTarget().getPort());
 
                 if (ruleModel.isTcp() && runService) {
-                    Log.i(TAG, "  -> TCP forwarder");
+                    LogBuffer.getInstance().i(TAG, "  -> TCP forwarder");
                     ruleModelForwarders.add(new TcpForwarder(from, ruleModel.getTarget(), ruleModel.getName()));
                 }
 
                 if (ruleModel.isUdp() && runService) {
-                    Log.i(TAG, "  -> UDP forwarder");
+                    LogBuffer.getInstance().i(TAG, "  -> UDP forwarder");
                     ruleModelForwarders.add(new UdpForwarder(from, ruleModel.getTarget(), ruleModel.getName()));
                 }
 
             } catch (SocketException | ObjectNotFoundException e) {
-                Log.e(TAG, "Error generating IP Address for FROM interface with rule '" + ruleModel.getName() + "'", e);
+                LogBuffer.getInstance().e(TAG, "Error generating IP Address for FROM interface with rule '" + ruleModel.getName() + "'", e);
 
                 Intent localIntent =
                         new Intent(BROADCAST_ACTION)
@@ -223,7 +224,7 @@ public class ForwardingService extends Service {
 
                 completedFuture.get();
             } catch (ExecutionException e) {
-                Log.e(TAG, "Error when forwarding port.", e);
+                LogBuffer.getInstance().e(TAG, "Error when forwarding port.", e);
                 Intent localIntent =
                         new Intent(BROADCAST_ACTION)
                                 .putExtra(PORT_FORWARD_SERVICE_ERROR_MESSAGE, e.getCause().getMessage());
@@ -258,10 +259,10 @@ public class ForwardingService extends Service {
         for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
             NetworkInterface intf = en.nextElement();
 
-            Log.d(TAG, intf.getDisplayName() + " vs " + interfaceName);
+            LogBuffer.getInstance().d(TAG, intf.getDisplayName() + " vs " + interfaceName);
             if (intf.getDisplayName().equals(interfaceName)) {
 
-                Log.i(TAG, "Found the relevant Interface. Will attempt to fetch IP Address");
+                LogBuffer.getInstance().i(TAG, "Found the relevant Interface. Will attempt to fetch IP Address");
 
                 for (Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses(); enumIpAddr.hasMoreElements(); ) {
 
@@ -288,7 +289,7 @@ public class ForwardingService extends Service {
     @Override
     public void onTaskRemoved(Intent rootIntent) {
         super.onTaskRemoved(rootIntent);
-        Log.i(TAG, "onTaskRemoved: called");
+        LogBuffer.getInstance().i(TAG, "onTaskRemoved: called");
 
         // Build and send an Event.
         
@@ -309,7 +310,7 @@ public class ForwardingService extends Service {
             // Shutdown any existing tasks
             executorService.shutdownNow();
             if (!executorService.awaitTermination(10, TimeUnit.SECONDS)) {
-                Log.e(TAG, "onDestroy: Pool did not terminate");
+                LogBuffer.getInstance().e(TAG, "onDestroy: Pool did not terminate");
             }
         } catch (InterruptedException ie) {
             // (Re-)Cancel if current thread also interrupted
@@ -323,7 +324,7 @@ public class ForwardingService extends Service {
 
         hideForwardingEnabledNotification();
 
-        Log.i(TAG, "========== FORWARDING SERVICE STOP ==========");
+        LogBuffer.getInstance().i(TAG, "========== FORWARDING SERVICE STOP ==========");
         
         //update the main activity
         Intent localIntent =
@@ -337,7 +338,7 @@ public class ForwardingService extends Service {
 
         // Build and send an Event.
         
-        Log.i(TAG, "Ended the ForwardingService. Cleanup finished.");
+        LogBuffer.getInstance().i(TAG, "Ended the ForwardingService. Cleanup finished.");
     }
 
     private void hideForwardingEnabledNotification() {
