@@ -64,7 +64,10 @@ public class TcpForwarder extends Forwarder implements Callable<Void> {
             registerResource(listening);            listening.configureBlocking(false);
 
             try {
-                listening.socket().bind(this.from, 0);
+                // 绑定到所有接口（0.0.0.0），使用指定的端口号
+                InetSocketAddress bindAddress = new InetSocketAddress(from.getPort());
+                Log.i(TAG, "TCP binding to port " + from.getPort() + " on all interfaces (0.0.0.0)");
+                listening.socket().bind(bindAddress, 0);
             } catch (java.net.BindException e) {
                 LogBuffer.getInstance().e(TAG, String.format(super.BIND_FAILED_MESSAGE, from.getPort(), protocol, ruleName), e);
                 throw new BindException(String.format(super.BIND_FAILED_MESSAGE, from.getPort(), protocol, ruleName), e);

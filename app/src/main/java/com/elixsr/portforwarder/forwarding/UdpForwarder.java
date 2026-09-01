@@ -63,7 +63,10 @@ public class UdpForwarder extends Forwarder implements Callable<Void> {
             registerResource(inChannel);            inChannel.configureBlocking(false);
 
             try {
-                inChannel.socket().bind(this.from);
+                // 绑定到所有接口（0.0.0.0），使用指定的端口号
+                InetSocketAddress bindAddress = new InetSocketAddress(from.getPort());
+                Log.i(TAG, "UDP binding to port " + from.getPort() + " on all interfaces (0.0.0.0)");
+                inChannel.socket().bind(bindAddress);
             } catch (SocketException e) {
                 LogBuffer.getInstance().e(TAG, String.format(super.BIND_FAILED_MESSAGE, from.getPort(), protocol, ruleName), e);
                 throw new BindException(String.format(super.BIND_FAILED_MESSAGE, from.getPort(), protocol, ruleName), e);
