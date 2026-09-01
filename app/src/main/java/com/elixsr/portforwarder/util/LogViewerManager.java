@@ -6,7 +6,6 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
-import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -152,20 +151,20 @@ public class LogViewerManager {
 
     /**
      * 滚动到底部
-     * 关键：必须在 TextView 布局完成之后滚动，否则 getLineCount() / getLineTop()
-     * 仍使用旧布局，导致滚动位置计算错误。使用 ViewTreeObserver 监听布局完成。
+     * 使用 scrollView.post() 在下一帧布局完成后执行，直接滚到子内容的最底部。
+     * 不依赖 OnGlobalLayoutListener（避免内容高度未变时回调不触发的问题）。
      */
     private void scrollToBottom() {
         if (scrollView == null || logTextView == null) {
             return;
         }
-        ViewTreeObserver observer = logTextView.getViewTreeObserver();
-        observer.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+        scrollView.post(new Runnable() {
             @Override
-            public void onGlobalLayout() {
-                // 布局完成后立即移除监听，避免重复触发
-                logTextView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                scrollView.fullScroll(View.FOCUS_DOWN);
+            public void run() {
+                // 强制测量，确保拿到最新的内容高度
+                logTextView.requestLayout();
+                int bottom = logTextView.getMeasuredHeight();
+                scrollView.scrollTo(0, Math.max(0, bottom - scrollView.getHeight()));
             }
         });
     }
