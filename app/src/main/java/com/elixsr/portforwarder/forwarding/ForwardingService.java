@@ -154,6 +154,18 @@ public class ForwardingService extends Service {
 
         showForwardingEnabledNotification();
 
+        // 在后台线程执行阻塞操作，避免 ANR
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                startForwardingRules();
+            }
+        }).start();
+
+        return START_STICKY;
+    }
+
+    private void startForwardingRules() {
         RuleDao ruleDao = new RuleDao(new RuleDbHelper(this));
         List<RuleModel> ruleModels = ruleDao.getAllEnabledRuleModels();
 
@@ -180,7 +192,7 @@ public class ForwardingService extends Service {
             } catch (SocketException | ObjectNotFoundException e) {
                 Log.e(TAG, "Error generating IP Address for FROM interface with rule '" + ruleModel.getName() + "'", e);
 
-                localIntent =
+                Intent localIntent =
                         new Intent(BROADCAST_ACTION)
                                 .putExtra(PORT_FORWARD_SERVICE_ERROR_MESSAGE, getString(R.string.start_rule_error_message) + " '" + ruleModel.getName() + "'");
                 LocalBroadcastManager.getInstance(this).sendBroadcast(localIntent);
@@ -207,7 +219,7 @@ public class ForwardingService extends Service {
                 completedFuture.get();
             } catch (ExecutionException e) {
                 Log.e(TAG, "Error when forwarding port.", e);
-                localIntent =
+                Intent localIntent =
                         new Intent(BROADCAST_ACTION)
                                 .putExtra(PORT_FORWARD_SERVICE_ERROR_MESSAGE, e.getCause().getMessage());
                 LocalBroadcastManager.getInstance(this).sendBroadcast(localIntent);
@@ -217,8 +229,6 @@ public class ForwardingService extends Service {
                 e.printStackTrace();
             }
         }
-
-        return START_STICKY;
     }
 
     private void startFloatingWindow() {
