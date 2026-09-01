@@ -6,6 +6,7 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -28,7 +29,6 @@ public class LogViewerManager {
     private Handler handler;
     private boolean isAutoScroll = true;
     private boolean isRunning = false;
-    private int lastLineCount = 0;
     private LogBuffer logBuffer;
 
     public LogViewerManager(Context context) {
@@ -131,7 +131,7 @@ public class LogViewerManager {
                         logTextView.setText(logText);
                     }
 
-                    // 如果开启自动滚动，则滚动到底部
+                    // 如果开启自动滚动，则等待布局完成后滚动到底部
                     if (isAutoScroll) {
                         scrollToBottom();
                     }
@@ -146,30 +146,28 @@ public class LogViewerManager {
     private void clearLogs() {
         if (logTextView != null) {
             logTextView.setText("");
-            lastLineCount = 0;
             logBuffer.clear();
         }
     }
 
     /**
      * 滚动到底部
+     * 关键：必须在 TextView 布局完成之后滚动，否则 getLineCount() / getLineTop()
+     * 仍使用旧布局，导致滚动位置计算错误。使用 ViewTreeObserver 监听布局完成。
      */
     private void scrollToBottom() {
-        if (scrollView != null && logTextView != null) {
-            scrollView.post(new Runnable() {
-                @Override
-                public void run() {
-                    // 使用多种方式确保滚动到底部
-                    scrollView.fullScroll(View.FOCUS_DOWN);
-                    
-                    // 备用方案：滚动到最后的位置
-                    int scrollAmount = logTextView.getLayout().getLineTop(logTextView.getLineCount()) - scrollView.getHeight();
-                    if (scrollAmount > 0) {
-                        scrollView.scrollTo(0, scrollAmount);
-                    }
-                }
-            });
+        if (scrollView == null || logTextView == null) {
+            return;
         }
+        ViewTreeObserver observer = logTextView.getViewTreeObserver();
+        observer.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                // 布局完成后立即移除监听，避免重复触发
+                logTextView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                scrollView.fullScroll(View.FOCUS_DOWN);
+            }
+        });
     }
 
     /**
