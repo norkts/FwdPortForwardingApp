@@ -72,9 +72,8 @@ public class LogViewerManager {
             public void onClick(View v) {
                 isAutoScroll = !isAutoScroll;
                 autoScrollButton.setText("自动滚动: " + (isAutoScroll ? "开" : "关"));
-                if (isAutoScroll) {
-                    scrollToBottom();
-                }
+                // 切换后立即刷新日志以应用滚动行为
+                refreshLogs();
             }
         });
 
@@ -132,12 +131,10 @@ public class LogViewerManager {
                         logTextView.setText(logText);
                     }
 
-                    // 如果有新日志且开启自动滚动，则滚动到底部
-                    int lineCount = logText.isEmpty() ? 0 : logText.split("\n").length;
-                    if (isAutoScroll && lineCount > lastLineCount) {
+                    // 如果开启自动滚动，则滚动到底部
+                    if (isAutoScroll) {
                         scrollToBottom();
                     }
-                    lastLineCount = lineCount;
                 }
             }
         });
@@ -158,11 +155,18 @@ public class LogViewerManager {
      * 滚动到底部
      */
     private void scrollToBottom() {
-        if (scrollView != null) {
+        if (scrollView != null && logTextView != null) {
             scrollView.post(new Runnable() {
                 @Override
                 public void run() {
+                    // 使用多种方式确保滚动到底部
                     scrollView.fullScroll(View.FOCUS_DOWN);
+                    
+                    // 备用方案：滚动到最后的位置
+                    int scrollAmount = logTextView.getLayout().getLineTop(logTextView.getLineCount()) - scrollView.getHeight();
+                    if (scrollAmount > 0) {
+                        scrollView.scrollTo(0, scrollAmount);
+                    }
                 }
             });
         }
